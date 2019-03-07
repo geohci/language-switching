@@ -6,9 +6,13 @@ from session_utils import Pageview, Session
 p1 = Pageview(dt='2019-02-16T11:31:53', proj='enwiki', title='Columbidae', wd='Q10856')
 p2 = Pageview(dt='2019-02-16T11:32:05', proj='enwiki', title='Anarchism', wd='Q6199')
 p3 = Pageview(dt='2019-02-16T11:32:13', proj='eswiki', title='Columbidae', wd='Q10856')
+p4 = Pageview(dt='2019-02-16T11:32:28', proj='dewiki', title='Columbidae', wd='Q10856')
 
 def session_with_enwikifrom_switches():
     return Session("USER_ENWIKIFROM_SWITCHES", "COUNTRY", [p1, p2, p3])
+
+def session_with_enwikifrom_twoswitches():
+    return Session("USER_ENWIKIFROM_SWITCHES", "COUNTRY", [p1, p2, p3, p4])
 
 def session_with_enwikito_switches():
     return Session("USER_ENWIKITO_SWITCHES", "COUNTRY", [p3, p1, p2])
@@ -18,6 +22,8 @@ def session_with_no_switches():
 
 def main():
     assert get_lang_switch(pvs=session_with_enwikifrom_switches().pageviews, wikidbs=("enwiki",)) == [(0,2)]
+    assert get_lang_switch(pvs=session_with_enwikifrom_twoswitches().pageviews, wikidbs=("enwiki",)) == [(0,2)]
+    assert get_lang_switch(pvs=session_with_enwikifrom_twoswitches().pageviews, wikidbs=()) == [(0,2),(2,3)]
     assert get_lang_switch(pvs=session_with_enwikito_switches().pageviews, wikidbs=("enwiki",)) == [(0,1)]
     assert get_lang_switch(pvs=session_with_no_switches().pageviews, wikidbs=("enwiki",)) == []
 
