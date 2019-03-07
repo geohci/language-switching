@@ -1,5 +1,6 @@
 import argparse
 import csv
+import glob
 import logging
 import os
 import pickle
@@ -62,7 +63,7 @@ def main():
                         help="Process only this many sessions.")
     parser.add_argument("--debug", action="store_true",
                         help="More verbose logging")
-    parser.add_argument("--maxpvs", type=int, default=500,
+    parser.add_argument("--maxpvs", type=int, default=200,
                         help="Max pageviews in a session to still be included in analysis.")
     parser.add_argument("--numfolds", type=int, default=10,
                         help="number of folds for new train/test of logistic regression model")
@@ -83,12 +84,15 @@ def main():
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
 
+    if len(args.tsvs) == 1:
+        args.tsvs = glob.glob(args.tsvs[0])
+
     logging.info("Args: {0}".format(args))
     wiki_db = args.lang
     direction = args.direction
     wiki_lang = wiki_db.replace("wiki", "")
     if wiki_db == wiki_lang:
-        raise Exception("Invalid lang. Should be like enwiki: {0}".format(args.lang_from))
+        raise Exception("Invalid lang. Should be like enwiki: {0}".format(args.lang))
     if direction not in ("to", "from"):
         raise Exception("Invalid direction. Should be either 'to' or 'from'")
 
@@ -105,6 +109,10 @@ def main():
                     switches.append(line[1:])
                 elif line[0] == 'N':
                     non_switches.append(line[1:])
+        logging.info("Before filtering:")
+        logging.info("{0} switches.".format(len(switches)))
+        logging.info("{0} non switches.".format(len(non_switches)))
+
     else:
         logging.info("Building balanced dataset of switches / non-switches")
         wd_to_entitle = {}
@@ -156,24 +164,6 @@ def main():
         logging.info("{0} switches.".format(len(switches)))
         logging.info("{0} non switches.".format(len(non_switches)))
 
-        # make sure we have LDA vectors for the titles
-        logging.info("After filtering to only titles with LDA topics:")
-        removed = set()
-        for idx in range(len(switches)-1, -1, -1):
-            if switches[idx][2] not in titles:
-                removed.add(switches.pop(idx)[2])
-        for idx in range(len(non_switches)-1, -1, -1):
-            if non_switches[idx][2] not in titles:
-                removed.add(non_switches.pop(idx)[2])
-        logging.info("{0} switches.".format(len(switches)))
-        logging.info("{0} non switches.".format(len(non_switches)))
-        logging.info("{0} removed: {1}".format(len(removed), removed))
-
-        # only keep as many as there are switches so we have a balanced dataset
-        logging.info("After balancing:")
-        keep_indices = np.random.choice(len(non_switches), len(switches), replace=False)
-        non_switches = [non_switches[idx] for idx in keep_indices]
-
         if args.output_tsv:
             with open(args.output_tsv, 'w') as fout:
                 csvwriter = csv.writer(fout, delimiter="\t")
@@ -181,6 +171,24 @@ def main():
                     csvwriter.writerow(['S'] + [f for f in s])
                 for n in non_switches:
                     csvwriter.writerow(['N'] + [f for f in n])
+
+    # make sure we have LDA vectors for the titles
+    logging.info("After filtering to only titles with LDA topics:")
+    removed = set()
+    for idx in range(len(switches)-1, -1, -1):
+        if switches[idx][2] not in titles:
+            removed.add(switches.pop(idx)[2])
+    for idx in range(len(non_switches)-1, -1, -1):
+        if non_switches[idx][2] not in titles:
+            removed.add(non_switches.pop(idx)[2])
+    logging.info("{0} switches.".format(len(switches)))
+    logging.info("{0} non switches.".format(len(non_switches)))
+    logging.debug("{0} removed: {1}".format(len(removed), removed))
+
+    # only keep as many as there are switches so we have a balanced dataset
+    logging.info("After balancing:")
+    keep_indices = np.random.choice(len(non_switches), len(switches), replace=False)
+    non_switches = [non_switches[idx] for idx in keep_indices]
 
     logging.info("{0} switches.".format(len(switches)))
     logging.info("{0} non switches.".format(len(non_switches)))
