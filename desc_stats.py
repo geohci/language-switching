@@ -1,5 +1,6 @@
 import argparse
 from copy import deepcopy
+import glob
 import logging
 
 from session_utils import tsv_to_sessions
@@ -22,6 +23,10 @@ def main():
     parser.add_argument("--wdids_to_print", nargs="+", default=[],
                         help="Wikidata IDs to track more thoroughly")
     args = parser.parse_args()
+
+    if len(args.tsvs) == 1:
+        args.tsvs = glob.glob(args.tsvs[0])
+    logging.info(args)
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
