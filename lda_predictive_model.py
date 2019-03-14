@@ -7,6 +7,7 @@ import pickle
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_val_score
 
 from session_utils import tsv_to_sessions
@@ -49,6 +50,13 @@ def load_topic_model(lda_dir, lang):
 
     return (ndims, titles, topic_model, topic_descs)
 
+def meets_filter(switch, pvs_per_title, min_filtering):
+    cntry = switch[0]
+    ttl = switch[2]
+    if pvs_per_title[ttl][cntry] >= min_filtering:
+        return True
+    return False
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tsvs", nargs="+",
@@ -63,8 +71,10 @@ def main():
                         help="Process only this many sessions.")
     parser.add_argument("--debug", action="store_true",
                         help="More verbose logging")
-    parser.add_argument("--maxpvs", type=int, default=200,
+    parser.add_argument("--maxpvs", type=int, default=100,
                         help="Max pageviews in a session to still be included in analysis.")
+    parser.add_argument("--min_filtering", type=int, default=10,
+                        help="Minimum number of times a given page (e.g., enwiki + Chicago) must show up to be included.")
     parser.add_argument("--numfolds", type=int, default=10,
                         help="number of folds for new train/test of logistic regression model")
     parser.add_argument("--holdout_type", default="random", help="")
@@ -116,6 +126,7 @@ def main():
     else:
         logging.info("Building balanced dataset of switches / non-switches")
         wd_to_entitle = {}
+        pvs_per_title = {}
         # build balanced dataset
         i = 0
         for tsv in args.tsvs:
@@ -127,8 +138,18 @@ def main():
                 if i % 500000 == 0:
                     logging.info("{0} sessions analyzed.".format(i))
 
+                # update country-pagetitle stats for filtering
+                pvs = session.pageviews
+                for pv in pvs:
+                    if pv.proj == wiki_db:
+                        ttl = pv.title
+                        cntry = session.country
+                        if ttl not in pvs_per_title:
+                            pvs_per_title[ttl] = {}
+                        pvs_per_title[ttl][cntry] = pvs_per_title[ttl].get(cntry, 0) + 1
+
                 # filter out likely bots
-                num_pvs = len(session.pageviews)
+                num_pvs = len(pvs)
                 if num_pvs > args.maxpvs:
                     continue
 
@@ -139,7 +160,6 @@ def main():
 
                 # only analyze language switching when >1 pageview associated w/ device (~50% of sessions)
                 if num_pvs > 1:
-                    pvs = session.pageviews
                     unique_langs = set([p.proj for p in pvs])
                     # has language of interest and at least one potential switch
                     candidate = wiki_db in unique_langs and len(unique_langs) > 1
@@ -167,10 +187,26 @@ def main():
         if args.output_tsv:
             with open(args.output_tsv, 'w') as fout:
                 csvwriter = csv.writer(fout, delimiter="\t")
+                kept = 0
+                under_filter = 0
                 for s in switches:
-                    csvwriter.writerow(['S'] + [f for f in s])
+                    if meets_filter(s, pvs_per_title, args.min_filtering):
+                        kept += 1
+                        csvwriter.writerow(['S'] + [f for f in s])
+                    else:
+                        under_filter += 1
+                logging.info("{0} switches kept; {1} did not meet country-pagetitle filter of {2}".format(
+                    kept, under_filter, args.min_filtering))
+                kept = 0
+                under_filter = 0
                 for n in non_switches:
-                    csvwriter.writerow(['N'] + [f for f in n])
+                    if meets_filter(n, pvs_per_title, args.min_filtering):
+                        kept += 1
+                        csvwriter.writerow(['N'] + [f for f in n])
+                    else:
+                        under_filter += 1
+                logging.info("{0} non-switches kept; {1} did not meet country-pagetitle filter of {2}".format(
+                    kept, under_filter, args.min_filtering))
 
     # make sure we have LDA vectors for the titles
     logging.info("After filtering to only titles with LDA topics:")
@@ -203,20 +239,27 @@ def main():
         i += 1
     y = [1] * len(switches) + [0] * len(non_switches)
 
-    logging.info("Actual:")
-    pred_scores = predictive_model(X, y, num_folds=args.numfolds, topic_descs=topic_descs)
-    logging.info("Baseline:")
-    baseline_scores = predictive_model(np.random.random(X.shape), y, num_folds=args.numfolds)
-    if args.results_tsv:
-        with open(args.results_tsv, 'a') as fout:
-            tsvwriter = csv.writer(fout, delimiter="\t")
-            tsvwriter.writerow([wiki_lang, 'predictions', len(X), pred_scores])
-            tsvwriter.writerow([wiki_lang, 'baseline', len(X), baseline_scores])
+    if args.numfolds > 0:
+        logging.info("Actual:")
+        pred_scores = predictive_model(X, y, num_folds=args.numfolds, topic_descs=topic_descs)
+        logging.info("Baseline:")
+        baseline_scores = predictive_model(np.random.random(X.shape), y, num_folds=args.numfolds)
+        if args.results_tsv:
+            with open(args.results_tsv, 'a') as fout:
+                tsvwriter = csv.writer(fout, delimiter="\t")
+                tsvwriter.writerow([wiki_lang, 'predictions', len(X), pred_scores])
+                tsvwriter.writerow([wiki_lang, 'baseline', len(X), baseline_scores])
 
 def predictive_model(X, y, num_folds=5, topic_descs=None):
     clf = LogisticRegression(solver='lbfgs', penalty='l2', C=0.1)
-    scores = cross_val_score(estimator=clf, X=X, y=y, cv=num_folds)
-    logging.info("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
+    if num_folds > 1:
+        scores = cross_val_score(estimator=clf, X=X, y=y, cv=num_folds)
+        logging.info("Accuracy: {0:.2f} (+/- {1:.2f})".format(scores.mean(), scores.std() * 2))
+    else:
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+        clf.fit(X_train, y_train)
+        scores = [clf.score(X_test, y_test)]
+        logging.info("Accuracy: {0:.2f}".format(scores[0]))
     if topic_descs:
         clf.fit(X, y)
         coef_importance = np.argsort(clf.coef_[0])
