@@ -72,6 +72,8 @@ def build_dataset(args, wiki_db):
             if i % args.log_every == 0:
                 logging.info("{0} sessions analyzed.".format(i))
 
+            ut = session.usertype
+
             # update country-pagetitle stats for filtering
             pvs = session.pageviews
             for pv in pvs:
@@ -104,17 +106,17 @@ def build_dataset(args, wiki_db):
                         user_non_switches = get_nonlang_switch(pvs, wiki_db, user_switches, direction=direction)
                         if direction == "from":
                             switches.extend(
-                                [(pvs[j].proj, session.country, pvs[i].wd, pvs[i].title, pvs[i].dt) for i, j in
+                                [(pvs[j].proj, session.country, pvs[i].wd, pvs[i].title, pvs[i].dt, ut) for i, j in
                                  user_switches if pvs[i].proj == wiki_db])
                             non_switches.extend(
-                                [(NON_SWITCH_PLACEHOLDER, session.country, pvs[i].wd, pvs[i].title, pvs[i].dt) for i in
+                                [(NON_SWITCH_PLACEHOLDER, session.country, pvs[i].wd, pvs[i].title, pvs[i].dt, ut) for i in
                                  user_non_switches if pvs[i].proj == wiki_db])
                         elif direction == "to":
                             switches.extend(
-                                [(pvs[i].proj, session.country, pvs[j].wd, pvs[j].title, pvs[j].dt) for i, j in
+                                [(pvs[i].proj, session.country, pvs[j].wd, pvs[j].title, pvs[j].dt, ut) for i, j in
                                  user_switches if pvs[j].proj == wiki_db])
                             non_switches.extend(
-                                [(NON_SWITCH_PLACEHOLDER, session.country, pvs[i].wd, pvs[i].title, pvs[i].dt) for i in
+                                [(NON_SWITCH_PLACEHOLDER, session.country, pvs[i].wd, pvs[i].title, pvs[i].dt, ut) for i in
                                  user_non_switches if pvs[i].proj == wiki_db])
                         logging.debug('{0} pvs:\t{1}'.format(len(pvs), pvs))
                         logging.debug('    Switches:\t{0}'.format([(pvs[i], pvs[j]) for i, j in user_switches]))
