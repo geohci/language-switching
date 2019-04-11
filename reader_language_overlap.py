@@ -8,6 +8,7 @@ import pandas as pd
 
 from session_utils import tsv_to_sessions
 from session_utils import get_lang_switch
+from session_utils import usertypes
 
 def main():
     parser = argparse.ArgumentParser()
@@ -46,6 +47,10 @@ def main():
     # number of views per language project
     proj_pvs = {}
 
+    for d in [switch_to_from, lang_cooccurrence, lang_counts, proj_pvs]:
+        for ut in usertypes:
+            d[ut] = {}
+
     i = 0
     for tsv in args.tsvs:
         logging.info("Processing: {0}".format(tsv))
@@ -57,6 +62,8 @@ def main():
             if i % 500000 == 0:
                 logging.info("{0} sessions analyzed.".format(i))
 
+            ut = session.usertype
+
             # filter out likely bots
             pvs = session.pageviews
             num_pvs = len(pvs)
@@ -65,62 +72,71 @@ def main():
 
             unique_langs = set([p.proj for p in pvs])
             for proj in unique_langs:
-                proj_pvs[proj] = proj_pvs.get(proj, 0) + 1
+                proj_pvs[ut][proj] = proj_pvs[ut].get(proj, 0) + 1
 
-            # only analyze language switching when >1 pageview associated w/ device (~50% of sessions)
-            if num_pvs > 1:
-                num_langs = len(unique_langs)
-                lang_counts[num_langs] = lang_counts.get(num_langs, 0) + 1
-                if num_langs > 1:
-                    lang_switches = get_lang_switch(pvs)
-                    for ls_pair in lang_switches:
-                        frompv = pvs[ls_pair[0]]
-                        topv = pvs[ls_pair[1]]
-                        tf = '{0}-{1}'.format(frompv.proj, topv.proj)
-                        switch_to_from[tf] = switch_to_from.get(tf, 0) + 1
-                    sorted_langs = sorted(unique_langs)
-                    for li in range(0, num_langs - 1):
-                        for lj in range(li+1, num_langs):
-                            tf = '{0}-{1}'.format(sorted_langs[li], sorted_langs[lj])
-                            lang_cooccurrence[tf] = lang_cooccurrence.get(tf, 0) + 1
-                else:
-                    single_lang = pvs[0].proj
-                    tf = '{0}-{0}'.format(single_lang)
-                    lang_cooccurrence[tf] = lang_cooccurrence.get(tf, 0) + 1
-                    switch_to_from[tf] = switch_to_from.get(tf, 0) + 1
+            num_langs = len(unique_langs)
+            lang_counts[ut][num_langs] = lang_counts[ut].get(num_langs, 0) + 1
+            if num_langs > 1:
+                lang_switches = get_lang_switch(pvs)
+                tfs = set()
+                for ls_pair in lang_switches:
+                    frompv = pvs[ls_pair[0]]
+                    topv = pvs[ls_pair[1]]
+                    tf = '{0}-{1}'.format(frompv.proj, topv.proj)
+                    tfs.add(tf)
+                for tf in tfs:
+                    switch_to_from[ut][tf] = switch_to_from[ut].get(tf, 0) + 1
+                sorted_langs = sorted(unique_langs)
+                for li in range(0, num_langs - 1):
+                    for lj in range(li+1, num_langs):
+                        tf = '{0}-{1}'.format(sorted_langs[li], sorted_langs[lj])
+                        lang_cooccurrence[ut][tf] = lang_cooccurrence[ut].get(tf, 0) + 1
+            else:
+                single_lang = pvs[0].proj
+                tf = '{0}-{0}'.format(single_lang)
+                lang_cooccurrence[ut][tf] = lang_cooccurrence[ut].get(tf, 0) + 1
+                switch_to_from[ut][tf] = switch_to_from[ut].get(tf, 0) + 1
 
 
     logging.info("\nLangs per userhash:")
-    print_stats(lang_counts, 10, "langs")
+    for ut in usertypes:
+        logging.info("==={0}===".format(ut))
+        print_stats(lang_counts[ut], 10, "langs")
 
     logging.info("\nLanguage pairs:")
-    print_stats(switch_to_from, 30, "")
+    for ut in usertypes:
+        logging.info("==={0}===".format(ut))
+        print_stats(switch_to_from[ut], 30, "")
 
     logging.info("\nWeighted language pairs:")
-    weighted_to_from = weight_by_proj(switch_to_from, proj_pvs)
-    print_stats(weighted_to_from, 20, "", context_dict=switch_to_from)
+    for ut in usertypes:
+        logging.info("==={0}===".format(ut))
+        weighted_to_from = weight_by_proj(switch_to_from[ut], proj_pvs[ut])
+        print_stats(weighted_to_from, 20, "", context_dict=switch_to_from[ut])
 
     if args.switch_fn:
-        with open(args.switch_fn, "w") as fout:
-            csvwriter = csv.writer(fout, delimiter="\t")
-            csvwriter.writerow(['to', 'from', 'count', 'to_lang_totalpv', 'from_lang_totalpv'])
-            for tf in switch_to_from:
-                tolang, fromlang = tf.split("-")
-                count = switch_to_from.get(tf)
-                csvwriter.writerow([tolang, fromlang, count, proj_pvs[tolang], proj_pvs[fromlang]])
-    lang_coocurrence_csv(switch_to_from, proj_pvs)
+        for ut in usertypes:
+            with open(args.switch_fn.replace('.tsv', '_{0}.tsv'.format(ut)), "w") as fout:
+                csvwriter = csv.writer(fout, delimiter="\t")
+                csvwriter.writerow(['to', 'from', 'count', 'to_lang_totalsessions', 'from_lang_totalsessions'])
+                for tf in switch_to_from[ut]:
+                    tolang, fromlang = tf.split("-")
+                    count = switch_to_from[ut].get(tf)
+                    csvwriter.writerow([tolang, fromlang, count, proj_pvs[ut][tolang], proj_pvs[ut][fromlang]])
+#        lang_coocurrence_csv(switch_to_from, proj_pvs)
 
     if args.cooc_fn:
-        with open(args.cooc_fn, "w") as fout:
-            csvwriter = csv.writer(fout, delimiter="\t")
-            csvwriter.writerow(['to', 'from', 'count', 'to_lang_totalpv', 'from_lang_totalpv'])
-            for lc in lang_cooccurrence:
-                l1, l2 = lc.split("-")
-                count = lang_cooccurrence.get(lc)
-                csvwriter.writerow([l1, l2, count, proj_pvs[l1], proj_pvs[l2]])
-                if l1 != l2:
-                    csvwriter.writerow([l2, l1, count, proj_pvs[l2], proj_pvs[l1]])
-    lang_coocurrence_csv(lang_cooccurrence, proj_pvs)
+        for ut in usertypes:
+            with open(args.cooc_fn.replace('.tsv', '_{0}.tsv'.format(ut)), "w") as fout:
+                csvwriter = csv.writer(fout, delimiter="\t")
+                csvwriter.writerow(['to', 'from', 'count', 'to_lang_totalpv', 'from_lang_totalpv'])
+                for lc in lang_cooccurrence[ut]:
+                    l1, l2 = lc.split("-")
+                    count = lang_cooccurrence[ut].get(lc)
+                    csvwriter.writerow([l1, l2, count, proj_pvs[ut][l1], proj_pvs[ut][l2]])
+                    if l1 != l2:
+                        csvwriter.writerow([l2, l1, count, proj_pvs[ut][l2], proj_pvs[ut][l1]])
+#       lang_coocurrence_csv(lang_cooccurrence, proj_pvs)
 
 
 def lang_coocurrence_csv(switches, lang_counts, fn=None):

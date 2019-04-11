@@ -5,6 +5,7 @@ import logging
 
 from session_utils import tsv_to_sessions
 from session_utils import get_lang_switch
+from session_utils import usertypes
 
 def main():
     parser = argparse.ArgumentParser()
@@ -38,7 +39,6 @@ def main():
                   "\t*language switching defined as same wikidata item, different project\n"
                   "\t*devices w/ greater than {0} pageviews dropped as likely bots.".format(args.maxpvs)))
 
-    usertypes = ['reader', 'editor']
     # count of language pairs involved in switches (directional)
     to_from = {}
     # number of page views per session
@@ -186,7 +186,7 @@ def main():
     logging.info("\nTop-viewed WD items:")
     for ut in usertypes:
         logging.info("==={0}===".format(ut))
-        print_stats(wd_pvs[ut], 100, "")
+        print_stats(wd_pvs[ut], 40, "")
 
     for ut in usertypes:
         if wd_examples[ut]:

@@ -10,6 +10,7 @@ logging.basicConfig(level=logging.INFO)
 Session = namedtuple('Session', ['usrhash', 'country', 'pageviews', 'usertype'])
 Pageview = namedtuple('Pageview', ['dt','proj','title','wd'])
 EDIT_STR = "EDITATTEMPT"
+usertypes = ['reader', 'editor']
 
 def tsv_to_sessions(tsv, trim=False):
     """Convert TSV file of pageviews to reader sessions.
