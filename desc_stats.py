@@ -38,6 +38,7 @@ def main():
                   "\t*language switching defined as same wikidata item, different project\n"
                   "\t*devices w/ greater than {0} pageviews dropped as likely bots.".format(args.maxpvs)))
 
+    usertypes = ['reader', 'editor']
     # count of language pairs involved in switches (directional)
     to_from = {}
     # number of page views per session
@@ -58,8 +59,14 @@ def main():
     wd_to_entitle = {}
     # if wdids_to_print, keep track of the switches for these Wikidata IDs
     wd_examples = {}
-    for wditem in args.wdids_to_print:
-        wd_examples[wditem] = {}
+    for ut in usertypes:
+        wd_examples[ut] = {}
+        for wditem in args.wdids_to_print:
+            wd_examples[ut][wditem] = {}
+
+    for d in [to_from, pv_counts, lang_counts, switch_counts, lang_to, lang_from, wd_pvs, proj_pvs]:
+        for ut in usertypes:
+            d[ut] = {}
 
     i = 0
     for tsv in args.tsvs:
@@ -72,95 +79,121 @@ def main():
             if i % 500000 == 0:
                 logging.info("{0} sessions analyzed.".format(i))
 
+            ut = session.usertype
+
             # filter out likely bots
             num_pvs = len(session.pageviews)
-            pv_counts[num_pvs] = pv_counts.get(num_pvs, 0) + 1
+            pv_counts[ut][num_pvs] = pv_counts[ut].get(num_pvs, 0) + 1
             if num_pvs > args.maxpvs:
                 continue
 
             for pv in session.pageviews:
                 wditem = pv.wd
                 if wditem:
-                    wd_pvs[wditem] = wd_pvs.get(wditem, 0) + 1
+                    wd_pvs[ut][wditem] = wd_pvs[ut].get(wditem, 0) + 1
                     if pv.proj == 'enwiki':
                         wd_to_entitle[wditem] = pv.title
-                proj_pvs[pv.proj] = proj_pvs.get(pv.proj, 0) + 1
+                proj_pvs[ut][pv.proj] = proj_pvs[ut].get(pv.proj, 0) + 1
 
             # only analyze language switching when >1 pageview associated w/ device (~50% of sessions)
             if num_pvs > 1:
                 pvs = session.pageviews
                 num_langs = len(set([p.proj for p in pvs]))
-                lang_counts[num_langs] = lang_counts.get(num_langs, 0) + 1
+                lang_counts[ut][num_langs] = lang_counts[ut].get(num_langs, 0) + 1
                 if num_langs > 1:
                     lang_switches = get_lang_switch(pvs)
                     num_switches = len(lang_switches)
-                    switch_counts[num_switches] = switch_counts.get(num_switches, 0) + 1
+                    switch_counts[ut][num_switches] = switch_counts[ut].get(num_switches, 0) + 1
                     for ls_pair in lang_switches:
                         frompv = pvs[ls_pair[0]]
                         topv = pvs[ls_pair[1]]
                         if not args.langs or frompv.proj in args.langs or topv.proj in args.langs:
                             tf = '{0}-{1}'.format(frompv.proj, topv.proj)
-                            to_from[tf] = to_from.get(tf, 0) + 1
+                            to_from[ut][tf] = to_from[ut].get(tf, 0) + 1
                             if frompv.wd in args.wdids_to_print:
-                                wd_examples[frompv.wd][tf] = wd_examples[frompv.wd].get(tf, 0) + 1
+                                wd_examples[ut][frompv.wd][tf] = wd_examples[ut][frompv.wd].get(tf, 0) + 1
 
                         if frompv.proj == args.language_stats:
-                            lang_from[frompv.wd] = lang_from.get(frompv.wd, 0) + 1
+                            lang_from[ut][frompv.wd] = lang_from[ut].get(frompv.wd, 0) + 1
                         elif topv.proj == args.language_stats:
-                            lang_to[topv.wd] = lang_to.get(topv.wd, 0) + 1
+                            lang_to[ut][topv.wd] = lang_to[ut].get(topv.wd, 0) + 1
 
-    logging.info("{0} users with switches ({1} false alarms) out of {2} sessions.".format(
-        sum([v for k,v in switch_counts.items() if k > 0]), switch_counts.get(0, -1), i))
+    for ut in usertypes:
+        logging.info("{0}: {1} users with switches ({2} false alarms) out of {3} sessions.".format(
+            ut, sum([v for k,v in switch_counts[ut].items() if k > 0]), switch_counts[ut].get(0, -1), i))
 
     # print summary stats on sessions
     logging.info("\nPVs per userhash:")
-    print_stats(pv_counts, 10, "pageviews")
+    for ut in usertypes:
+        logging.info("==={0}===".format(ut))
+        print_stats(pv_counts[ut], 10, "pageviews")
 
     logging.info("\nLangs per userhash:")
-    logging.info("Not included because 1 pageview: {0}".format(pv_counts[1]))
-    print_stats(lang_counts, 10, "langs")
+    for ut in usertypes:
+        logging.info("==={0}===".format(ut))
+        logging.info("Not included because 1 pageview: {0}".format(pv_counts[ut][1]))
+        print_stats(lang_counts[ut], 10, "langs")
 
     logging.info("\nSwitches per userhash:")
-    logging.info("Not included because 1 pageview: {0}".format(pv_counts[1]))
-    logging.info("Not included because 2+ pageviews but 1 language: {0}".format(lang_counts[1]))
-    print_stats(switch_counts, 10, "switches")
+    for ut in usertypes:
+        logging.info("==={0}===".format(ut))
+        logging.info("Not included because 1 pageview: {0}".format(pv_counts[ut][1]))
+        logging.info("Not included because 2+ pageviews but 1 language: {0}".format(lang_counts[ut][1]))
+        print_stats(switch_counts[ut], 10, "switches")
 
     # print summary stats on individual pages
     # normalize keys w/ wd-item + english title if available for easier interpretation
-    for d in [wd_pvs, lang_from, lang_to]:
-        for wditem in list(d.keys()):
-            entitle = wd_to_entitle.get(wditem, "UNK")
-            count = d.pop(wditem)
-            d['{0} ({1})'.format(wditem, entitle)] = count
+    for ut in usertypes:
+        for d in [wd_pvs[ut], lang_from[ut], lang_to[ut]]:
+            for wditem in list(d.keys()):
+                entitle = wd_to_entitle.get(wditem, "UNK")
+                count = d.pop(wditem)
+                d['{0} ({1})'.format(wditem, entitle)] = count
 
     logging.info("\n{0} pages from:".format(args.language_stats))
-    print_stats(lang_from, 20, "")
+    for ut in usertypes:
+        logging.info("==={0}===".format(ut))
+        print_stats(lang_from[ut], 20, "")
 
     logging.info("\nWeighted {0} pages from:".format(args.language_stats))
-    weight_by_pvs(lang_from, wd_pvs)
-    print_stats(lang_from, 20, "", context_dict=wd_pvs)
+    for ut in usertypes:
+        logging.info("==={0}===".format(ut))
+        weight_by_pvs(lang_from[ut], wd_pvs[ut])
+        print_stats(lang_from[ut], 20, "", context_dict=wd_pvs[ut])
 
     logging.info("\n{0} pages to:".format(args.language_stats))
-    print_stats(lang_to, 20, "")
+    for ut in usertypes:
+        logging.info("==={0}===".format(ut))
+        print_stats(lang_to[ut], 20, "")
 
     logging.info("\nWeighted {0} pages to:".format(args.language_stats))
-    weight_by_pvs(lang_to, wd_pvs)
-    print_stats(lang_to, 20, "", context_dict=wd_pvs)
+    for ut in usertypes:
+        logging.info("==={0}===".format(ut))
+        weight_by_pvs(lang_to[ut], wd_pvs[ut])
+        print_stats(lang_to[ut], 20, "", context_dict=wd_pvs[ut])
 
     logging.info("\nLanguage pairs:")
-    print_stats(to_from, 30, "")
+    for ut in usertypes:
+        logging.info("==={0}===".format(ut))
+        print_stats(to_from[ut], 30, "")
 
     logging.info("\nWeighted language pairs:")
-    weighted_to_from = weight_by_proj(to_from, proj_pvs)
-    print_stats(weighted_to_from, 20, "", context_dict=to_from)
+    for ut in usertypes:
+        logging.info("==={0}===".format(ut))
+        weighted_to_from = weight_by_proj(to_from[ut], proj_pvs[ut])
+        print_stats(weighted_to_from[ut], 20, "", context_dict=to_from[ut])
 
     logging.info("\nTop-viewed WD items:")
-    print_stats(wd_pvs, 100, "")
+    for ut in usertypes:
+        logging.info("==={0}===".format(ut))
+        print_stats(wd_pvs[ut], 100, "")
 
-    if wd_examples:
-        for wditem in wd_examples:
-            logging.info('{0} ({1}):'.format(wditem, wd_to_entitle[wditem]))
-            print_stats(wd_examples[wditem], threshold=20, lbl="", context_dict=to_from)
+    for ut in usertypes:
+        if wd_examples[ut]:
+            logging.info("==={0}===".format(ut))
+            for wditem in wd_examples[ut]:
+                logging.info('{0} ({1}):'.format(wditem, wd_to_entitle[wditem]))
+                print_stats(wd_examples[ut][wditem], threshold=20, lbl="", context_dict=to_from[ut])
 
 
 def weight_by_proj(countdict, pvs_by_proj, minpv_threshold=500):

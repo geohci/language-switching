@@ -7,8 +7,9 @@ import sys
 csv.field_size_limit(sys.maxsize)
 logging.basicConfig(level=logging.INFO)
 
-Session = namedtuple('Session', ['usrhash', 'country', 'pageviews'])
+Session = namedtuple('Session', ['usrhash', 'country', 'pageviews', 'usertype'])
 Pageview = namedtuple('Pageview', ['dt','proj','title','wd'])
+EDIT_STR = "EDITATTEMPT"
 
 def tsv_to_sessions(tsv, trim=False):
     """Convert TSV file of pageviews to reader sessions.
@@ -36,6 +37,7 @@ def tsv_to_sessions(tsv, trim=False):
         assert next(fin).strip().split("\t") == expected_header
         curr_usr = None
         country = None
+        usertype = 'reader'
         session = []
         for i, line in enumerate(fin):
             line = line.strip().split("\t")
@@ -44,21 +46,30 @@ def tsv_to_sessions(tsv, trim=False):
                 wd_item = line[wd_idx]
             except IndexError:
                 wd_item = None
-            pv = Pageview(line[dt_idx], line[proj_idx], line[title_idx], wd_item)
+            title = line[title_idx]
+            pv = Pageview(line[dt_idx], line[proj_idx], title, wd_item)
             if usr == curr_usr:
-                session.append(pv)
+                if title == EDIT_STR:
+                    usertype = 'editor'
+                else:
+                    session.append(pv)
             else:
                 if curr_usr:
                     if trim:
                         trim_session(session)
-                    yield(Session(curr_usr, country, session))
+                    yield(Session(curr_usr, country, session, usertype=usertype))
                 curr_usr = usr
                 country = line[country_idx]
-                session = [pv]
+                if title == EDIT_STR:
+                    usertype = 'editor'
+                    session = []
+                else:
+                    usertype = 'reader'
+                    session = [pv]
         if curr_usr:
             if trim:
                 trim_session(session)
-            yield (Session(curr_usr, country, session))
+            yield (Session(curr_usr, country, session, usertype=usertype))
 
 def trim_session(pvs):
     """Remove duplicate page views (matching title and project).
