@@ -67,7 +67,7 @@ def main():
             # filter out likely bots
             pvs = session.pageviews
             num_pvs = len(pvs)
-            if num_pvs > args.maxpvs:
+            if not num_pvs or num_pvs > args.maxpvs:
                 continue
 
             unique_langs = set([p.proj for p in pvs])
