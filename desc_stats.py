@@ -181,7 +181,7 @@ def main():
     for ut in usertypes:
         logging.info("==={0}===".format(ut))
         weighted_to_from = weight_by_proj(to_from[ut], proj_pvs[ut])
-        print_stats(weighted_to_from[ut], 20, "", context_dict=to_from[ut])
+        print_stats(weighted_to_from, 20, "", context_dict=to_from[ut])
 
     logging.info("\nTop-viewed WD items:")
     for ut in usertypes:
