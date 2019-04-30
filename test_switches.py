@@ -9,16 +9,16 @@ p3 = Pageview(dt='2019-02-16T11:32:13', proj='eswiki', title='Columbidae', wd='Q
 p4 = Pageview(dt='2019-02-16T11:32:28', proj='dewiki', title='Columbidae', wd='Q10856')
 
 def session_with_enwikifrom_switches():
-    return Session("USER_ENWIKIFROM_SWITCHES", "COUNTRY", [p1, p2, p3])
+    return Session("USER_ENWIKIFROM_SWITCHES", "COUNTRY", [p1, p2, p3], 'reader')
 
 def session_with_enwikifrom_twoswitches():
-    return Session("USER_ENWIKIFROM_SWITCHES", "COUNTRY", [p1, p2, p3, p4])
+    return Session("USER_ENWIKIFROM_SWITCHES", "COUNTRY", [p1, p2, p3, p4], 'reader')
 
 def session_with_enwikito_switches():
-    return Session("USER_ENWIKITO_SWITCHES", "COUNTRY", [p3, p1, p2])
+    return Session("USER_ENWIKITO_SWITCHES", "COUNTRY", [p3, p1, p2], 'reader')
 
 def session_with_no_switches():
-    return Session("USER_NO_SWITCHES", "COUNTRY", [p2, p3])
+    return Session("USER_NO_SWITCHES", "COUNTRY", [p2, p3], 'reader')
 
 def main():
     assert get_lang_switch(pvs=session_with_enwikifrom_switches().pageviews, wikidbs=("enwiki",)) == [(0,2)]
