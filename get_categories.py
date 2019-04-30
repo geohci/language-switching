@@ -1,7 +1,9 @@
 import argparse
 import csv
+import json
 import os
 import time
+import traceback
 
 import mwapi
 import pandas as pd
@@ -12,6 +14,12 @@ def add_revids(lang, langswitches_tsv, output_fn):
     title_idx = header.index('title')
     qid_idx = header.index('qid')
     qid_to_revid = {}
+    if os.path.exists(output_fn):
+        with open(output_fn, 'r') as fin:
+            for line in fin:
+                record = json.loads(line)
+                qid_to_revid[record['qid']] = record['rev_id']
+
     max_titles_per_query = 50
     session = mwapi.Session(host='https://{0}.wikipedia.org'.format(lang),
                             user_agent='mwapi (python) -- m:Research:Language_switching_behavior_on_Wikipedia')
@@ -35,11 +43,17 @@ def add_revids(lang, langswitches_tsv, output_fn):
             if qid not in qid_to_revid and pagetitle not in pages_to_query:
                 pages_to_query.append(pagetitle)
                 if len(pages_to_query) == max_titles_per_query:
-                    title_to_revid = get_revids_by_title(session, base_parameters, pages_to_query)
-                    qid_to_revid.update({title_to_qid[title]:revid for title,revid in title_to_revid.items()})
-                    pages_to_query = []
+                    try:
+                        title_to_revid = get_revids_by_title(session, base_parameters, pages_to_query)
+                        qid_to_revid.update({title_to_qid[title]:revid for title,revid in title_to_revid.items()})
+                        pages_to_query = []
+                    except Exception:
+                        traceback.print_exc()
+                        print("Breaking off at line {0}".format(i+1))
+                        pages_to_query = []
+                        break
             i += 1
-            if i % 10000 == 0:
+            if i % 1000 == 0:
                 print("{0} lines processed.\t{1} revIDs.".format(i, len(qid_to_revid) + len(pages_to_query)))
         title_to_revid = get_revids_by_title(session, base_parameters, pages_to_query)
         qid_to_revid.update({title_to_qid[title]:revid for title,revid in title_to_revid.items()})
@@ -64,7 +78,12 @@ def get_revids_by_title(session, base_parameters, titles):
         for redirected in mostrecent_revids['query'].get('redirects', {}):
             title_map[redirected['to']] = title_map[redirected['from']]
         for page in mostrecent_revids['query']['pages']:
-            title_to_revid[title_map[page['title']]] = page['revisions'][0]['revid']
+            dataset_title = title_map[page['title']]
+            try:
+                title_to_revid[dataset_title] = page['revisions'][0]['revid']
+            except KeyError:
+                print("Skipping: {0}\t{1}".format(dataset_title, page['title']))
+                title_to_revid[dataset_title] = None
     return title_to_revid
 
 if __name__ == "__main__":
