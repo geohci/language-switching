@@ -53,6 +53,18 @@ def main():
     topicdf.sort_values(by='proportion', ascending=False, inplace=True)
     print(topicdf)
 
+    toptopics = {}
+    for t in switch_topics:
+        if t:
+            toptopic = t.split('.')[0]
+        else:
+            toptopic = 'None'
+        toptopics[toptopic] = toptopics.get(toptopic, 0) + switch_topics[t]
+    toptopicdf = pd.DataFrame([(topic, count) for topic, count in toptopics.items()], columns=['topic', 'count'])
+    toptopicdf['proportion'] = toptopicdf['count'].apply(lambda x: x / total_switches)
+
+    toptopicdf.sort_values(by='proportion', ascending=False, inplace=True)
+    print(toptopicdf)
 
 if __name__ == "__main__":
     main()
