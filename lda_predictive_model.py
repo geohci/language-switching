@@ -14,7 +14,7 @@ from session_utils import tsv_to_sessions
 from session_utils import get_lang_switch
 from session_utils import get_nonlang_switch
 
-NON_SWITCH_PLACEHOLDER = "N\A"
+NON_SWITCH_PLACEHOLDER = "N/A"
 
 def load_topic_model(lda_dir, lang):
     # load in topic model for selected language
@@ -108,16 +108,13 @@ def build_dataset(args, wiki_db):
                             switches.extend(
                                 [(pvs[j].proj, session.country, pvs[i].wd, pvs[i].title, pvs[i].dt, ut) for i, j in
                                  user_switches if pvs[i].proj == wiki_db])
-                            non_switches.extend(
-                                [(NON_SWITCH_PLACEHOLDER, session.country, pvs[i].wd, pvs[i].title, pvs[i].dt, ut) for i in
-                                 user_non_switches if pvs[i].proj == wiki_db])
                         elif direction == "to":
                             switches.extend(
                                 [(pvs[i].proj, session.country, pvs[j].wd, pvs[j].title, pvs[j].dt, ut) for i, j in
                                  user_switches if pvs[j].proj == wiki_db])
-                            non_switches.extend(
-                                [(NON_SWITCH_PLACEHOLDER, session.country, pvs[i].wd, pvs[i].title, pvs[i].dt, ut) for i in
-                                 user_non_switches if pvs[i].proj == wiki_db])
+                        non_switches.extend(
+                            [(NON_SWITCH_PLACEHOLDER, session.country, pvs[i].wd, pvs[i].title, pvs[i].dt, ut) for i in
+                             user_non_switches if pvs[i].proj == wiki_db])
                         logging.debug('{0} pvs:\t{1}'.format(len(pvs), pvs))
                         logging.debug('    Switches:\t{0}'.format([(pvs[i], pvs[j]) for i, j in user_switches]))
                         logging.debug('Non-switches:\t{0}'.format([pvs[i] for i in user_non_switches]))
