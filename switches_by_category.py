@@ -50,7 +50,7 @@ def main():
     topicdf = pd.DataFrame([(topic, count) for topic, count in switch_topics.items()], columns=['topic', 'count'])
     topicdf['proportion'] = topicdf['count'].apply(lambda x: x / total_switches)
 
-    topicdf.sort_values(by='proportion', ascending=False)
+    topicdf.sort_values(by='proportion', ascending=False, inplace=True)
     print(topicdf)
 
 
