@@ -18,7 +18,7 @@ def add_revids(lang, langswitches_tsv, output_fn):
         with open(output_fn, 'r') as fin:
             for line in fin:
                 record = json.loads(line)
-                qid_to_revid[record['qid']] = record['rev_id']
+                qid_to_revid[record['qid']] = int(record['rev_id'])
 
     max_titles_per_query = 50
     session = mwapi.Session(host='https://{0}.wikipedia.org'.format(lang),
@@ -62,6 +62,7 @@ def add_revids(lang, langswitches_tsv, output_fn):
     # dump in correct format
     revid_df = pd.DataFrame([(qid, revid) for qid, revid in qid_to_revid.items()],
                             columns=['qid', 'revid'])
+    revid_df['revid'] = revid_df['revid'].astype('int64')
     revid_df.to_json(path_or_buf=output_fn, orient='records', lines=True)
 
 
@@ -80,7 +81,7 @@ def get_revids_by_title(session, base_parameters, titles):
         for page in mostrecent_revids['query']['pages']:
             dataset_title = title_map[page['title']]
             try:
-                title_to_revid[dataset_title] = page['revisions'][0]['revid']
+                title_to_revid[dataset_title] = int(page['revisions'][0]['revid'])
             except KeyError:
                 print("Skipping: {0}\t{1}".format(dataset_title, page['title']))
                 title_to_revid[dataset_title] = None
