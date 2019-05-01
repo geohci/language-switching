@@ -98,10 +98,7 @@ if __name__ == "__main__":
         else:
             dir = os.path.dirname(fn)
             lang = os.path.basename(fn).split('_')[0]
-            output_fn = os.path.join(fn.replace(".tsv", "_revid.json"))
-            if output_fn == fn:
-                print("Skipping. Expected TSV:", output_fn)
-                continue
+            output_fn = os.path.join(dir, '{0}_revids.json'.format(lang))
             print("Processing {0}. From {1} to {2}".format(lang, fn, output_fn))
             time.sleep(3)
             add_revids(lang, fn, output_fn)
