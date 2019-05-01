@@ -65,8 +65,8 @@ def add_revids(lang, langswitches_tsv, output_fn):
 
     # dump in correct format
     revid_df = pd.DataFrame([(qid, revid) for qid, revid in qid_to_revid.items()],
-                            columns=['qid', 'revid'])
-    revid_df['revid'] = revid_df['revid'].astype('int64')
+                            columns=['qid', 'rev_id'])
+    revid_df['rev_id'] = revid_df['rev_id'].astype('int64')
     revid_df.to_json(path_or_buf=output_fn, orient='records', lines=True)
 
 
@@ -88,7 +88,7 @@ def get_revids_by_title(session, base_parameters, titles):
                 title_to_revid[dataset_title] = int(page['revisions'][0]['revid'])
             except KeyError:
                 print("Skipping: {0}\t{1}".format(dataset_title, page['title']))
-                title_to_revid[dataset_title] = None
+                title_to_revid[dataset_title] = 0
     return title_to_revid
 
 if __name__ == "__main__":
