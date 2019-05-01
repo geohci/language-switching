@@ -62,30 +62,29 @@ def add_revids(langswitches_tsv, output_fn):
 
     with open(langswitches_tsv, 'r') as fin:
         tsvreader = csv.reader(fin, delimiter='\t')
-        titles_to_query = []
         title_to_qid = {}
         for i, line in enumerate(tsvreader):
             if i % 1000 == 0:
-                print("{0} lines processed.\t{1} revIDs.".format(i, len(qid_to_revid) + len(titles_to_query)))
+                print("{0} lines processed.\t{1} revIDs.".format(i, len(qid_to_revid) + len(title_to_qid)))
             if line[switch_idx] == 'N\A' or line[switch_idx] == 'N/A':
                 continue
             qid = line[qid_idx]
             if qid and qid not in qid_to_revid:
                 # get canonical title from wikidata mapping, else title reported in dataset
                 title = qid_to_entitle.get(qid, line[title_idx])
-                if title and title not in titles_to_query:
-                    titles_to_query.append(title)
-                    if len(titles_to_query) == max_titles_per_query:
+                if title and title not in title_to_qid:
+                    title_to_qid[title] = qid
+                    if len(title_to_qid) == max_titles_per_query:
                         try:
-                            title_to_revid = get_revids_by_title(session, base_parameters, titles_to_query)
+                            title_to_revid = get_revids_by_title(session, base_parameters, title_to_qid)
                             qid_to_revid.update({title_to_qid[title]:revid for title,revid in title_to_revid.items()})
-                            titles_to_query = []
+                            title_to_qid = {}
                         except Exception:
                             traceback.print_exc()
                             print("Breaking off at line {0}".format(i+1))
-                            titles_to_query = []
+                            title_to_qid = {}
                             break
-        title_to_revid = get_revids_by_title(session, base_parameters, titles_to_query)
+        title_to_revid = get_revids_by_title(session, base_parameters, title_to_qid)
         qid_to_revid.update({title_to_qid[title]:revid for title,revid in title_to_revid.items()})
         print("Finished: {0} lines processed. {1} revIDs.".format(i, len(qid_to_revid)))
 
