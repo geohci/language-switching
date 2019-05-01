@@ -194,8 +194,6 @@ def main():
                         help="Minimum number of times a given page (e.g., enwiki + Chicago) must show up to be included.")
     parser.add_argument("--numfolds", type=int, default=10,
                         help="number of folds for new train/test of logistic regression model")
-    parser.add_argument("--calc_stats", action="store_true",
-                        help="Calculate some basic statistics about the switching")
     parser.add_argument("--output_tsv", default=None,
                         help=".tsv file to write balanced dataset to for future analyses")
     parser.add_argument("--results_tsv", default=None,

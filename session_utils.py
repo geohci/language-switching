@@ -34,6 +34,8 @@ def tsv_to_sessions(tsv, trim=False):
     dt_idx = expected_header.index('dt')
     country_idx = expected_header.index("country")
     wd_idx = expected_header.index("item_id")
+    malformed_lines = 0
+    i = 0
     with gzip.open(tsv, 'rt') as fin:
         assert next(fin).strip().split("\t") == expected_header
         curr_usr = None
@@ -42,13 +44,19 @@ def tsv_to_sessions(tsv, trim=False):
         session = []
         for i, line in enumerate(fin):
             line = line.strip().split("\t")
-            usr = line[usr_idx]
+            try:
+                usr = line[usr_idx]
+                proj = line[proj_idx]
+                title = line[title_idx]
+                dt = line[dt_idx]
+            except IndexError:
+                malformed_lines += 1
+                continue
             try:
                 wd_item = line[wd_idx]
             except IndexError:
                 wd_item = None
-            title = line[title_idx]
-            pv = Pageview(line[dt_idx], line[proj_idx], title, wd_item)
+            pv = Pageview(dt, proj, title, wd_item)
             if usr == curr_usr:
                 if title == EDIT_STR:
                     usertype = 'editor'
@@ -71,6 +79,7 @@ def tsv_to_sessions(tsv, trim=False):
             if trim:
                 trim_session(session)
             yield (Session(curr_usr, country, session, usertype=usertype))
+    print("{0} total lines. {1} malformed.".format(i, malformed_lines))
 
 def trim_session(pvs):
     """Remove duplicate page views (matching title and project).
