@@ -18,7 +18,10 @@ def add_revids(lang, langswitches_tsv, output_fn):
         with open(output_fn, 'r') as fin:
             for line in fin:
                 record = json.loads(line)
-                qid_to_revid[record['qid']] = int(record['rev_id'])
+                try:
+                    qid_to_revid[record['qid']] = int(record['rev_id'])
+                except TypeError:
+                    qid_to_revid[record['qid']] = 0
 
     max_titles_per_query = 50
     session = mwapi.Session(host='https://{0}.wikipedia.org'.format(lang),
