@@ -44,7 +44,7 @@ def main():
                 continue
             switch_topics[topic] = switch_topics.get(topic, 0) + 1
     total_switches = sum(switch_topics.values())
-    print("{0} different topics, {1} switches w/ topics. {1} switches w/o topics. {2} non-switches.".format(
+    print("{0} different topics, {1} switches w/ topics. {2} switches w/o topics. {3} non-switches.".format(
         len(switch_topics), total_switches, no_topic, non_switch))
 
     topicdf = pd.DataFrame([(topic, count) for topic, count in switch_topics.items()], columns=['topic', 'count'])
