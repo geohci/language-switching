@@ -34,6 +34,7 @@ def add_revids(lang, langswitches_tsv, output_fn):
                        'rvslots': 'main',
                        'redirects':'true'}
 
+    print("Starting with {0} QIDs:revids".format(len(qid_to_revid)))
     with open(langswitches_tsv, 'r') as fin:
         tsvreader = csv.reader(fin, delimiter='\t')
         pages_to_query = []
