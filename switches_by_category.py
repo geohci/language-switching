@@ -113,7 +113,7 @@ def main():
         else:
             toptopic = 'None'
         s_toptopics[toptopic] = s_toptopics.get(toptopic, 0) + switch_topics.get(t, 0)
-        n_toptopics[toptopic] = n_toptopics.get(n_toptopics, 0) + noswitch_topics.get(t, 0)
+        n_toptopics[toptopic] = n_toptopics.get(toptopic, 0) + noswitch_topics.get(t, 0)
     toptopicdf = pd.DataFrame([
         (topic, s_toptopics[topic], n_toptopics[topic]) for topic in s_toptopics],
         columns=['topic', 'switch_count', 'nonswitch_count'])
