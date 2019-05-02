@@ -1,5 +1,7 @@
 # Language Switching Analysis
+This repository contains code for building a dataset of verified language switches (same reading session, same Wikidata item, different Wikipedia language edition). It also contains scripts for generating descriptive statistics and a proof-of-concept predictive model.
 
+## Underlying data:
 Webrequest dataset created through the following Hive query:
 
     SELECT reflect('org.apache.commons.codec.digest.DigestUtils', 'sha512Hex', CONCAT(user_agent, client_ip, "{SALT}")) AS user,
@@ -27,8 +29,13 @@ The following WHERE clauses capture:
            
 Wikidata items (Q######) are then joined based by joining on project and page_id and the table is exported to a TSV file.
 
-Scripts:
-* desc_stats.py: basic descriptive statistics regarding user sessions and language switching
-* session_utils.py: utils for converting page views into sessions and identifying (non)-language switches
-* lda_predictive_model.py: proof-of-concept test with logistic regression and LDA topic model for predicting language switches.
-* test_switches.py: make sure language switching identification works as expected
+## Scripts:
+* Descriptive Statistics:
+  * desc_stats.py: basic descriptive statistics regarding user sessions and language switching
+  * switches_by_category.py: combine ORES drafttopic information by QID and a language switch dataset to show which categories of content are most strongly associated with switching
+* Utils:
+  * session_utils.py: utils for converting page views into sessions and identifying (non)-language switches
+  * get_categories.py: utils for gathering the most recent English Wikipedia revision ID associated w/ a Wikidata concept (for input into ORES) 
+  * test_switches.py: make sure language switching identification works as expected
+* Building Dataset:
+  * lda_predictive_model.py: builds language switch dataset and provides proof-of-concept test with logistic regression and LDA topic model for predicting language switches.
