@@ -32,7 +32,7 @@ def get_qid_to_enwikititle():
     return qid_to_entitle
 
 
-def add_revids(langswitches_tsv, output_fn):
+def add_revids(langswitches_tsv, output_fn, include_nonswitches=False):
     """Use this to generate the input for the ORES API"""
     header = ['switch', 'country', 'qid', 'title', 'datetime', 'usertype']
     qid_idx = header.index('qid')
@@ -63,10 +63,12 @@ def add_revids(langswitches_tsv, output_fn):
     with open(langswitches_tsv, 'r') as fin:
         tsvreader = csv.reader(fin, delimiter='\t')
         title_to_qid = {}
-        for i, line in enumerate(tsvreader):
+        i = 0
+        for line in tsvreader:
             if i % 1000 == 0:
                 print("{0} lines processed.\t{1} revIDs.".format(i, len(qid_to_revid) + len(title_to_qid)))
-            if line[switch_idx] == 'N\A' or line[switch_idx] == 'N/A':
+            i += 1
+            if not include_nonswitches and line[switch_idx] == 'N\A' or line[switch_idx] == 'N/A':
                 continue
             qid = line[qid_idx]
             if qid and qid not in qid_to_revid:
@@ -85,7 +87,7 @@ def add_revids(langswitches_tsv, output_fn):
                             title_to_qid = {}
                             break
         title_to_revid = get_revids_by_title(session, base_parameters, title_to_qid)
-        qid_to_revid.update({title_to_qid[title]:revid for title,revid in title_to_revid.items()})
+        qid_to_revid.update({title_to_qid[title]:revid for title, revid in title_to_revid.items()})
         print("Finished: {0} lines processed. {1} revIDs.".format(i, len(qid_to_revid)))
 
     # dump in correct format
@@ -119,6 +121,7 @@ def get_revids_by_title(session, base_parameters, titles):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--switches_tsvs", nargs="+")
+    parser.add_argument("--include_nonswitches", action="store_true", default=False)
     args = parser.parse_args()
 
     for fn in args.switches_tsvs:
@@ -130,6 +133,6 @@ if __name__ == "__main__":
             output_fn = os.path.join(dir, 'qid_revids.json')
             print("Processing {0}. From {1} to {2}".format(lang, fn, output_fn))
             time.sleep(3)
-            add_revids(fn, output_fn)
+            add_revids(fn, output_fn, args.include_nonswitches)
 
 
