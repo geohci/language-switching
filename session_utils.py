@@ -3,12 +3,14 @@ import csv
 import gzip
 import logging
 import sys
+import urllib.parse
 
 csv.field_size_limit(sys.maxsize)
 logging.basicConfig(level=logging.INFO)
 
+Switch = namedtuple("Switch", ['srclang', 'targetlang', 'country', 'qid', 'title', 'datetime', 'usertype', 'title_country_src_count'])
 Session = namedtuple('Session', ['usrhash', 'country', 'pageviews', 'usertype'])
-Pageview = namedtuple('Pageview', ['dt','proj','title','wd'])
+Pageview = namedtuple('Pageview', ['dt', 'proj', 'title', 'wd', 'referer'])
 EDIT_STR = "EDITATTEMPT"
 usertypes = ['reader', 'editor']
 
@@ -16,23 +18,24 @@ def tsv_to_sessions(tsv, trim=False):
     """Convert TSV file of pageviews to reader sessions.
 
     Each line corresponds to a pageview and the file is sorted by user and then time.
-    Fields order is: hashed user ID, wikipedia project, page title, page ID, datettime, IP country, Wikidata ID
+    Fields order is: hashed user ID, wikipedia project, page title, page ID, datettime, IP country, referer, Wikidata ID
     For example:
-    00000a5795ba512...  enwiki  Columbidae  63355   2019-02-16T11:31:53 Norway  Q10856
-    00000a5795ba512...  enwiki  Anarchism   12      2019-02-16T11:32:05 Norway  Q6199
+    00000a5795ba512...  enwiki  Columbidae  63355   2019-02-16T11:31:53 Norway  https://www.google.com/     Q10856
+    00000a5795ba512...  enwiki  Anarchism   12      2019-02-16T11:32:05 Norway  https://en.wikipedia.org/   Q6199
 
     This yields a Session object where:
     session.usrhash = '00000a5795ba512...'
     session.country = 'Norway'
-    session.pageviews = [(dt='2019-02-16T11:31:53', proj='enwiki', title='Columbidae', wd='Q10856'),
-                         (dt='2019-02-16T11:32:05', proj='enwiki', title='Anarchism', wd='Q6199')]
+    session.pageviews = [(dt='2019-02-16T11:31:53', proj='enwiki', title='Columbidae', wd='Q10856', referer='google'),
+                         (dt='2019-02-16T11:32:05', proj='enwiki', title='Anarchism', wd='Q6199', referer='enwiki')]
     """
-    expected_header = ['user', 'project', 'page_title', 'page_id', 'dt', 'country', 'item_id']
+    expected_header = ['user', 'project', 'page_title', 'page_id', 'dt', 'country', 'referer', 'item_id']
     usr_idx = expected_header.index('user')
     proj_idx = expected_header.index('project')
     title_idx = expected_header.index('page_title')
     dt_idx = expected_header.index('dt')
     country_idx = expected_header.index("country")
+    referer_idx = expected_header.index('referer')
     wd_idx = expected_header.index("item_id")
     malformed_lines = 0
     i = 0
@@ -49,6 +52,7 @@ def tsv_to_sessions(tsv, trim=False):
                 proj = line[proj_idx]
                 title = line[title_idx]
                 dt = line[dt_idx]
+                ref = ref_class(line[referer_idx])
             except IndexError:
                 malformed_lines += 1
                 continue
@@ -56,7 +60,7 @@ def tsv_to_sessions(tsv, trim=False):
                 wd_item = line[wd_idx]
             except IndexError:
                 wd_item = None
-            pv = Pageview(dt, proj, title, wd_item)
+            pv = Pageview(dt, proj, title, wd_item, ref)
             if usr == curr_usr:
                 if title == EDIT_STR:
                     usertype = 'editor'
@@ -81,6 +85,18 @@ def tsv_to_sessions(tsv, trim=False):
             yield (Session(curr_usr, country, session, usertype=usertype))
     print("{0} total lines. {1} malformed.".format(i, malformed_lines))
 
+
+def ref_class(referer):
+    dom = urllib.parse.urlparse(referer).netloc
+    if 'wikipedia' in dom:
+        return dom.split('.')[0].replace('-', '_') + 'wiki'
+    elif 'google' in dom:
+        return 'google'
+    else:
+        if dom.startswith('www.'):
+            dom = dom[4:]
+        return dom
+
 def trim_session(pvs):
     """Remove duplicate page views (matching title and project).
 
@@ -98,10 +114,10 @@ def trim_session(pvs):
         if pv_id in user_unique_pvs:
             pvs_to_remove.append(i)
         user_unique_pvs.add(pv_id)
-    for i in range(len(pvs_to_remove) - 1, -1, -1):
+    for i in range(len(pvs_to_remove)-1, -1, -1):
         pvs.pop(pvs_to_remove[i])
 
-def get_lang_switch(pvs, wikidbs=()):
+def get_lang_switch(pvs, wikidbs=(), ref_match=False):
     """Get pairs of page views that are language switches.
 
     Parameters:
@@ -128,7 +144,11 @@ def get_lang_switch(pvs, wikidbs=()):
                 same_item = pvs[i].wd and pvs[i].wd == pvs[j].wd
                 if diff_proj and same_item:
                     if not wikidbs or pvs[i].proj in wikidbs or pvs[j].proj in wikidbs:
-                        switches.append((i, j))
+                        if ref_match:
+                            if pvs[i].proj == pvs[j].referer:
+                                switches.append((i, j))
+                        else:
+                            switches.append((i, j))
                         break
     return switches
 

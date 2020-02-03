@@ -11,7 +11,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tsvs", nargs="+",
                         help=".tsv files with anonymized page views ordered by user/datetime")
-    parser.add_argument("--langs", nargs="+",
+    parser.add_argument("--langs", nargs="*",
                         help="if included, specific languages to only track switching statistics for")
     parser.add_argument("--stopafter", type=int, default=-1,
                         help="Process only this many sessions.")
@@ -23,6 +23,11 @@ def main():
                         help="Print article statistics for this language")
     parser.add_argument("--wdids_to_print", nargs="+", default=[],
                         help="Wikidata IDs to track more thoroughly")
+    parser.add_argument("--output_results",
+                        help="TSV file to print relationship between wikis")
+    parser.add_argument("--filter_editors",
+                        action="store_true",
+                        help="Filter out editors.")
     args = parser.parse_args()
 
     if len(args.tsvs) == 1:
@@ -59,12 +64,15 @@ def main():
     wd_to_entitle = {}
     # if wdids_to_print, keep track of the switches for these Wikidata IDs
     wd_examples = {}
+    # track referral sources of sessions
+    ref_counts_s = {}
+    ref_counts_pv = {}
     for ut in usertypes:
         wd_examples[ut] = {}
         for wditem in args.wdids_to_print:
             wd_examples[ut][wditem] = {}
 
-    for d in [to_from, pv_counts, lang_counts, switch_counts, lang_to, lang_from, wd_pvs, proj_pvs]:
+    for d in [to_from, pv_counts, lang_counts, switch_counts, lang_to, lang_from, wd_pvs, proj_pvs, ref_counts_pv, ref_counts_s]:
         for ut in usertypes:
             d[ut] = {}
 
@@ -83,9 +91,9 @@ def main():
 
             # filter out likely bots
             num_pvs = len(session.pageviews)
-            pv_counts[ut][num_pvs] = pv_counts[ut].get(num_pvs, 0) + 1
-            if num_pvs > args.maxpvs:
+            if not num_pvs or num_pvs > args.maxpvs:
                 continue
+            pv_counts[ut][num_pvs] = pv_counts[ut].get(num_pvs, 0) + 1
 
             for pv in session.pageviews:
                 wditem = pv.wd
@@ -94,6 +102,9 @@ def main():
                     if pv.proj == 'enwiki':
                         wd_to_entitle[wditem] = pv.title
                 proj_pvs[ut][pv.proj] = proj_pvs[ut].get(pv.proj, 0) + 1
+                ref_counts_pv[ut][pv.referer] = ref_counts_pv[ut].get(pv.referer, 0) + 1
+
+            ref_counts_s[ut][session.pageviews[0].referer] = ref_counts_s[ut].get(session.pageviews[0].referer, 0) + 1
 
             # only analyze language switching when >1 pageview associated w/ device (~50% of sessions)
             if num_pvs > 1:
@@ -131,15 +142,21 @@ def main():
     logging.info("\nLangs per userhash:")
     for ut in usertypes:
         logging.info("==={0}===".format(ut))
-        logging.info("Not included because 1 pageview: {0}".format(pv_counts[ut][1]))
+        logging.info("Not included because 1 pageview: {0}".format(pv_counts[ut].get(1, 0)))
         print_stats(lang_counts[ut], 10, "langs")
 
     logging.info("\nSwitches per userhash:")
     for ut in usertypes:
         logging.info("==={0}===".format(ut))
-        logging.info("Not included because 1 pageview: {0}".format(pv_counts[ut][1]))
-        logging.info("Not included because 2+ pageviews but 1 language: {0}".format(lang_counts[ut][1]))
+        logging.info("Not included because 1 pageview: {0}".format(pv_counts[ut].get(1, 0)))
+        logging.info("Not included because 2+ pageviews but 1 language: {0}".format(lang_counts[ut].get(1, 0)))
         print_stats(switch_counts[ut], 10, "switches")
+
+    logging.info("\nTop referral sources for first page in session:")
+    for ut in usertypes:
+        logging.info("==={0}===".format(ut))
+        print_stats(ref_counts_pv[ut], 10, "pageviews")
+        print_stats(ref_counts_s[ut], 10, 'sessions')
 
     # print summary stats on individual pages
     # normalize keys w/ wd-item + english title if available for easier interpretation
