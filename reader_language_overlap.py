@@ -118,7 +118,7 @@ def main():
         for ut in usertypes:
             with open(args.switch_fn.replace('.tsv', '_{0}.tsv'.format(ut)), "w") as fout:
                 csvwriter = csv.writer(fout, delimiter="\t")
-                csvwriter.writerow(['to', 'from', 'count', 'to_lang_totalsessions', 'from_lang_totalsessions'])
+                csvwriter.writerow(['to', 'from', 'count_switches', 'to_lang_totalsessions', 'from_lang_totalsessions'])
                 for tf in switch_to_from[ut]:
                     tolang, fromlang = tf.split("-")
                     count = switch_to_from[ut].get(tf)
@@ -129,7 +129,7 @@ def main():
         for ut in usertypes:
             with open(args.cooc_fn.replace('.tsv', '_{0}.tsv'.format(ut)), "w") as fout:
                 csvwriter = csv.writer(fout, delimiter="\t")
-                csvwriter.writerow(['to', 'from', 'count', 'to_lang_totalpv', 'from_lang_totalpv'])
+                csvwriter.writerow(['to', 'from', 'count_cooc', 'to_lang_totalsessions', 'from_lang_totalsessions'])
                 for lc in lang_cooccurrence[ut]:
                     l1, l2 = lc.split("-")
                     count = lang_cooccurrence[ut].get(lc)
